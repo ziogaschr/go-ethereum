@@ -178,6 +178,28 @@ func TestUnmarshalBig(t *testing.T) {
 	}
 }
 
+var unmarshalBigNegTests = []unmarshalTest{
+	{input: `"-0xfffffffff"`, want: new(big.Int).Neg(big.NewInt(0xfffffffff))},
+	{
+		input: `"-0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"`,
+		want:  new(big.Int).Neg(referenceBig("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")),
+	},
+}
+
+func TestUnmarshalBigNeg(t *testing.T) {
+	for _, test := range unmarshalBigNegTests {
+		var v BigNeg
+		err := json.Unmarshal([]byte(test.input), &v)
+		if !checkError(t, test.input, err, test.wantErr) {
+			continue
+		}
+		if test.want != nil && test.want.(*big.Int).Cmp((*big.Int)(&v)) != 0 {
+			t.Errorf("input %s: value mismatch: got %x, want %x", test.input, (*big.Int)(&v), test.want)
+			continue
+		}
+	}
+}
+
 var unmarshalU256Tests = []unmarshalTest{
 	// invalid encoding
 	{input: "", wantErr: errJSONEOF},

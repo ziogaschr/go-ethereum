@@ -228,6 +228,35 @@ func (b *Big) UnmarshalGraphQL(input interface{}) error {
 	return err
 }
 
+// BigNeg marshals/unmarshals as a JSON string with 0x prefix.
+// The zero value marshals as "0x0".
+//
+// Negative integers are supported.
+type BigNeg Big
+
+// MarshalText implements encoding.TextMarshaler
+func (b *BigNeg) MarshalText() ([]byte, error) {
+	return (*Big)(b).MarshalText()
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler
+func (b *BigNeg) UnmarshalText(input []byte) error {
+	negative := false
+	if len(input) >= 2 && input[0] == '-' {
+		negative = true
+		input = input[1:]
+	}
+	var dec big.Int
+	if err := (*Big)(&dec).UnmarshalText(input); err != nil {
+		return err
+	}
+	if negative {
+		dec.Neg(&dec)
+	}
+	*b = (BigNeg)(dec)
+	return nil
+}
+
 // U256 marshals/unmarshals as a JSON string with 0x prefix.
 // The zero value marshals as "0x0".
 type U256 uint256.Int
