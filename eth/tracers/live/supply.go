@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip4844"
 	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -31,6 +32,14 @@ type supplyInfo struct {
 	Number     uint64      `json:"blockNumber"`
 	Hash       common.Hash `json:"hash"`
 	ParentHash common.Hash `json:"parentHash"`
+}
+
+//go:generate go run github.com/fjl/gencodec -type supplyInfo -field-override supplyInfoMarshaling -out gen_supplyinfo.go
+type supplyInfoMarshaling struct {
+	Delta       *hexutil.BigNeg
+	Reward      *hexutil.Big
+	Withdrawals *hexutil.Big
+	Burn        *hexutil.Big
 }
 
 func (s *supplyInfo) burn(amount *big.Int) {
