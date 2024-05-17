@@ -18,16 +18,17 @@ package tracetest
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"math/big"
 	"os"
 	"path"
 	"path/filepath"
-	"reflect"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/consensus/beacon"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
@@ -43,10 +44,11 @@ import (
 )
 
 type supplyInfo struct {
-	Delta       *big.Int `json:"delta"`
-	Reward      *big.Int `json:"reward"`
-	Withdrawals *big.Int `json:"withdrawals"`
-	Burn        *big.Int `json:"burn"`
+	Delta       *hexutil.Big `json:"delta"`
+	DeltaSign   string       `json:"deltaSign"`
+	Reward      *hexutil.Big `json:"reward"`
+	Withdrawals *hexutil.Big `json:"withdrawals"`
+	Burn        *hexutil.Big `json:"burn"`
 
 	// Block info
 	Number     uint64      `json:"blockNumber"`
@@ -76,10 +78,11 @@ func TestSupplyGenesisAlloc(t *testing.T) {
 	)
 
 	expected := supplyInfo{
-		Delta:       new(big.Int).Mul(common.Big2, big.NewInt(params.Ether)),
-		Reward:      common.Big0,
-		Withdrawals: common.Big0,
-		Burn:        common.Big0,
+		Delta:       (*hexutil.Big)(new(big.Int).Mul(common.Big2, big.NewInt(params.Ether))),
+		DeltaSign:   "+",
+		Reward:      (*hexutil.Big)(common.Big0),
+		Withdrawals: (*hexutil.Big)(common.Big0),
+		Burn:        (*hexutil.Big)(common.Big0),
 		Number:      0,
 		Hash:        common.HexToHash("0xbcc9466e9fc6a8b56f4b29ca353a421ff8b51a0c1a58ca4743b427605b08f2ca"),
 		ParentHash:  common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000000"),
@@ -91,10 +94,7 @@ func TestSupplyGenesisAlloc(t *testing.T) {
 	}
 
 	actual := out[expected.Number]
-
-	if !reflect.DeepEqual(actual, expected) {
-		t.Fatalf("incorrect supply info: expected %+v, got %+v", expected, actual)
-	}
+	compareAsJSON(t, expected, actual)
 }
 
 func TestSupplyRewards(t *testing.T) {
@@ -107,10 +107,11 @@ func TestSupplyRewards(t *testing.T) {
 	)
 
 	expected := supplyInfo{
-		Delta:       new(big.Int).Mul(common.Big2, big.NewInt(params.Ether)),
-		Reward:      new(big.Int).Mul(common.Big2, big.NewInt(params.Ether)),
-		Withdrawals: common.Big0,
-		Burn:        common.Big0,
+		Delta:       (*hexutil.Big)(new(big.Int).Mul(common.Big2, big.NewInt(params.Ether))),
+		DeltaSign:   "+",
+		Reward:      (*hexutil.Big)(new(big.Int).Mul(common.Big2, big.NewInt(params.Ether))),
+		Withdrawals: (*hexutil.Big)(common.Big0),
+		Burn:        (*hexutil.Big)(common.Big0),
 		Number:      1,
 		Hash:        common.HexToHash("0xcbb08370505be503dafedc4e96d139ea27aba3cbc580148568b8a307b3f51052"),
 		ParentHash:  common.HexToHash("0xadeda0a83e337b6c073e3f0e9a17531a04009b397a9588c093b628f21b8bc5a3"),
@@ -122,10 +123,7 @@ func TestSupplyRewards(t *testing.T) {
 	}
 
 	actual := out[expected.Number]
-
-	if !reflect.DeepEqual(actual, expected) {
-		t.Fatalf("incorrect supply info: expected %+v, got %+v", expected, actual)
-	}
+	compareAsJSON(t, expected, actual)
 }
 
 func TestSupplyEip1559Burn(t *testing.T) {
@@ -174,10 +172,11 @@ func TestSupplyEip1559Burn(t *testing.T) {
 		reward   = new(big.Int).Mul(common.Big2, big.NewInt(params.Ether))
 		burn     = new(big.Int).Mul(big.NewInt(21000), head.BaseFee)
 		expected = supplyInfo{
-			Delta:       new(big.Int).Sub(reward, burn),
-			Reward:      reward,
-			Withdrawals: common.Big0,
-			Burn:        burn,
+			Delta:       (*hexutil.Big)(new(big.Int).Sub(reward, burn)),
+			DeltaSign:   "+",
+			Reward:      (*hexutil.Big)(reward),
+			Withdrawals: (*hexutil.Big)(common.Big0),
+			Burn:        (*hexutil.Big)(burn),
 			Number:      1,
 			Hash:        head.Hash(),
 			ParentHash:  head.ParentHash,
@@ -185,9 +184,7 @@ func TestSupplyEip1559Burn(t *testing.T) {
 	)
 
 	actual := out[expected.Number]
-	if !reflect.DeepEqual(actual, expected) {
-		t.Fatalf("incorrect supply info: expected %+v, got %+v", expected, actual)
-	}
+	compareAsJSON(t, expected, actual)
 }
 
 func TestSupplyWithdrawals(t *testing.T) {
@@ -216,20 +213,18 @@ func TestSupplyWithdrawals(t *testing.T) {
 	var (
 		head     = chain.CurrentBlock()
 		expected = supplyInfo{
-			Delta:       big.NewInt(1337000000000),
-			Reward:      common.Big0,
-			Withdrawals: big.NewInt(1337000000000),
-			Burn:        common.Big0,
+			Delta:       (*hexutil.Big)(big.NewInt(1337000000000)),
+			DeltaSign:   "+",
+			Reward:      (*hexutil.Big)(common.Big0),
+			Withdrawals: (*hexutil.Big)(big.NewInt(1337000000000)),
+			Burn:        (*hexutil.Big)(common.Big0),
 			Number:      1,
 			Hash:        head.Hash(),
 			ParentHash:  head.ParentHash,
 		}
 		actual = out[expected.Number]
 	)
-
-	if !reflect.DeepEqual(actual, expected) {
-		t.Fatalf("incorrect supply info: expected %+v, got %+v", expected, actual)
-	}
+	compareAsJSON(t, expected, actual)
 }
 
 // Tests fund retrieval after contract's selfdestruct.
@@ -314,20 +309,18 @@ func TestSupplySelfdestruct(t *testing.T) {
 	head := preCancunChain.CurrentBlock()
 	// Check live trace output
 	expected := supplyInfo{
-		Delta:       big.NewInt(-55294500000000),
-		Reward:      common.Big0,
-		Withdrawals: common.Big0,
-		Burn:        big.NewInt(55294500000000),
+		Delta:       (*hexutil.Big)(big.NewInt(55294500000000)),
+		DeltaSign:   "-",
+		Reward:      (*hexutil.Big)(common.Big0),
+		Withdrawals: (*hexutil.Big)(common.Big0),
+		Burn:        (*hexutil.Big)(big.NewInt(55294500000000)),
 		Number:      1,
 		Hash:        head.Hash(),
 		ParentHash:  head.ParentHash,
 	}
 
 	actual := preCancunOutput[expected.Number]
-
-	if !reflect.DeepEqual(actual, expected) {
-		t.Fatalf("Pre-cancun incorrect supply info: expected %+v, got %+v", expected, actual)
-	}
+	compareAsJSON(t, expected, actual)
 
 	// 2. Test post Cancun
 	cancunTime := uint64(0)
@@ -357,20 +350,18 @@ func TestSupplySelfdestruct(t *testing.T) {
 	// Check live trace output
 	head = postCancunChain.CurrentBlock()
 	expected = supplyInfo{
-		Delta:       big.NewInt(-55289500000000),
-		Reward:      common.Big0,
-		Withdrawals: common.Big0,
-		Burn:        big.NewInt(55289500000000),
+		Delta:       (*hexutil.Big)(big.NewInt(55289500000000)),
+		DeltaSign:   "-",
+		Reward:      (*hexutil.Big)(common.Big0),
+		Withdrawals: (*hexutil.Big)(common.Big0),
+		Burn:        (*hexutil.Big)(big.NewInt(55289500000000)),
 		Number:      1,
 		Hash:        head.Hash(),
 		ParentHash:  head.ParentHash,
 	}
 
 	actual = postCancunOutput[expected.Number]
-
-	if !reflect.DeepEqual(actual, expected) {
-		t.Fatalf("Post-cancun incorrect supply info: expected %+v, got %+v", expected, actual)
-	}
+	compareAsJSON(t, expected, actual)
 }
 
 // Tests selfdestructing contract to send its balance to itself (burn).
@@ -507,20 +498,18 @@ func TestSupplySelfdestructItselfAndRevert(t *testing.T) {
 	totalBurn := new(big.Int).Add(blockBurn, eth5) // 5ETH burned from contract B
 
 	expected := supplyInfo{
-		Delta:       new(big.Int).Neg(totalBurn),
-		Reward:      common.Big0,
-		Withdrawals: common.Big0,
-		Burn:        totalBurn,
+		Delta:       (*hexutil.Big)(totalBurn),
+		DeltaSign:   "-",
+		Reward:      (*hexutil.Big)(common.Big0),
+		Withdrawals: (*hexutil.Big)(common.Big0),
+		Burn:        (*hexutil.Big)(totalBurn),
 		Number:      1,
 		Hash:        block.Hash(),
 		ParentHash:  block.ParentHash(),
 	}
 
 	actual := output[expected.Number]
-
-	if !reflect.DeepEqual(actual, expected) {
-		t.Fatalf("incorrect supply info: expected %+v, got %+v", expected, actual)
-	}
+	compareAsJSON(t, expected, actual)
 }
 
 func testSupplyTracer(t *testing.T, genesis *core.Genesis, gen func(*core.BlockGen)) ([]supplyInfo, *core.BlockChain, error) {
@@ -574,4 +563,20 @@ func testSupplyTracer(t *testing.T, genesis *core.Genesis, gen func(*core.BlockG
 	}
 
 	return output, chain, nil
+}
+
+func compareAsJSON(t *testing.T, expected interface{}, actual interface{}) {
+	want, err := json.Marshal(expected)
+	if err != nil {
+		t.Fatalf("failed to marshal expected value to JSON: %v", err)
+	}
+
+	have, err := json.Marshal(actual)
+	if err != nil {
+		t.Fatalf("failed to marshal actual value to JSON: %v", err)
+	}
+
+	if !bytes.Equal(want, have) {
+		t.Fatalf("incorrect supply info: expected %s, got %s", string(want), string(have))
+	}
 }

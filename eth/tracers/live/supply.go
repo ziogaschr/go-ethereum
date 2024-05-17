@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip4844"
 	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -22,6 +23,7 @@ func init() {
 }
 
 type supplyInfo struct {
+	// DeltaSign   string   `json:"deltaSign"`
 	Delta       *big.Int `json:"delta"`
 	Reward      *big.Int `json:"reward"`
 	Withdrawals *big.Int `json:"withdrawals"`
@@ -31,6 +33,33 @@ type supplyInfo struct {
 	Number     uint64      `json:"blockNumber"`
 	Hash       common.Hash `json:"hash"`
 	ParentHash common.Hash `json:"parentHash"`
+}
+
+//go:generate go run github.com/fjl/gencodec -type supplyInfo -field-override supplyInfoMarshaling -out gen_supplyinfo.go
+
+// AbsBigInt is a wrapper around big.Int that marshals to a positive hexutil.Big
+type AbsBigInt big.Int
+
+func (b AbsBigInt) MarshalJSON() ([]byte, error) {
+	absVal := new(big.Int).Abs((*big.Int)(&b))
+	hexBig := hexutil.Big(*absVal)
+	return json.Marshal(&hexBig)
+}
+
+// DeltaSign returns the sign of the delta as a string
+func (s *supplyInfo) DeltaSign() string {
+	if s.Delta.Sign() == -1 {
+		return "-"
+	}
+	return "+"
+}
+
+type supplyInfoMarshaling struct {
+	Delta       *AbsBigInt
+	DeltaSign   string `json:"deltaSign"`
+	Reward      *hexutil.Big
+	Withdrawals *hexutil.Big
+	Burn        *hexutil.Big
 }
 
 func (s *supplyInfo) burn(amount *big.Int) {
